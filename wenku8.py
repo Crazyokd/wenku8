@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from fake_useragent import UserAgent
 import requests
 import os
 import time
@@ -8,10 +9,11 @@ os.environ['NO_PROXY']="pt.csust.edu.cn" # cancel proxy
 
 baseurl = 'https://www.wenku8.net/novel/2/2542/'
 header = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    'User-Agent': UserAgent().random
 }
 
 volumes = []
+title = ''
 
 def request_url(url):
     while True:
@@ -36,6 +38,9 @@ def get_contents():
 
         soup = BeautifulSoup(html_data, 'html.parser')
 
+        # 找到小说名
+        global title
+        title = soup.find('div', {'id': 'title'}).text.strip()
         # 找到包含章节信息的表格
         chapter_table = soup.find('table', class_='css')
 
@@ -135,7 +140,7 @@ def synthesize_file():
         for chapter in volume['chapters']:
             book += f"{volume['volume']} - {chapter['title']}" + '\n\n'
             book += '\t' + strip_file(f"{volume['volume']}/{chapter['title']}.txt") + '\n\n'
-    with open("想要成为影之实力者.txt", 'w', encoding='utf-8') as f:
+    with open(f"{title}.txt", 'w', encoding='utf-8') as f:
         f.write(book)
 
 
