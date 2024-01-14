@@ -186,6 +186,9 @@ if __name__ == '__main__':
                         help='the url for the novel catalog',
                         required=True,
                         dest='url')
+    parser.add_argument('-p', '--print',
+                        action='store_true',
+                        help='print the contents')
     parser.add_argument('-h', '--help', action='help',
                         help='show this help message and exit')
     parser.add_argument('-v', '--version', action='version',
@@ -197,6 +200,7 @@ if __name__ == '__main__':
     fix_baseurl()
 
     get_contents()
-    # print_contents()
+    if (args.print):
+        print_contents()
     get_chapter()
     synthesize_file()
