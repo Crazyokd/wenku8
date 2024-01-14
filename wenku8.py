@@ -6,6 +6,7 @@ import time
 import urllib3
 import argparse
 import sys
+from tqdm import tqdm
 
 os.environ['NO_PROXY']="pt.csust.edu.cn" # cancel proxy
 
@@ -48,30 +49,35 @@ def get_contents():
 
 
         # 遍历表格中的行
-        for row in chapter_table.find_all('tr'):
-            # 检查是否为卷标题行
-            volume_tag = row.find('td', class_='vcss')
-            if volume_tag:
-                current_volume = volume_tag.text.strip()
-                volumes.append({
-                    'volume': current_volume,
-                    'chapters': []
-                })
-                continue
-
-            # 检查是否为章节行
-            chapter_tag = row.find('td', class_='ccss')
-            while chapter_tag:
-                if current_volume:
-                    if not chapter_tag.a:
-                        break
-                    chapter_title = chapter_tag.a.text.strip()
-                    chapter_href = chapter_tag.a.get('href', '')
-                    volumes[-1]['chapters'].append({
-                        'title': f"{chapter_title}",
-                        'href': chapter_href
+        with tqdm(total=len(chapter_table.find_all('tr')),
+                  desc="Getting directory", ncols=80) as pbar:
+            for row in chapter_table.find_all('tr'):
+                # 检查是否为卷标题行
+                volume_tag = row.find('td', class_='vcss')
+                if volume_tag:
+                    current_volume = volume_tag.text.strip()
+                    volumes.append({
+                        'volume': current_volume,
+                        'chapters': []
                     })
-                chapter_tag = chapter_tag.find_next_sibling('td', class_='ccss')
+                    pbar.update()
+                    continue
+
+                # 检查是否为章节行
+                chapter_tag = row.find('td', class_='ccss')
+                while chapter_tag:
+                    if current_volume:
+                        if not chapter_tag.a:
+                            break
+                        chapter_title = chapter_tag.a.text.strip()
+                        chapter_href = chapter_tag.a.get('href', '')
+                        volumes[-1]['chapters'].append({
+                            'title': f"{chapter_title}",
+                            'href': chapter_href
+                        })
+                    chapter_tag = chapter_tag.find_next_sibling('td', class_='ccss')
+
+                pbar.update()
     else:
         print("network error", response.status_code, response.content)
 
@@ -91,28 +97,39 @@ def create_dir(path:str):
         print(f"Creation of directory '{path}' failed: {error}")
 
 
+def count_chapter():
+    res = 0
+    for volume in volumes:
+        res += len(volume['chapters'])
+    return res
+
+
 def get_chapter():
     valid_request = 1
-    while valid_request > 0:
-        valid_request = 0
-        for volume in volumes:
-            create_dir(volume['volume'])
-            for chapter in volume['chapters']:
-                if (os.path.exists(f"{volume['volume']}/{chapter['title']}.txt")):
-                    continue
-                time.sleep(2)
-                try:
-                    response = requests.get(baseurl+chapter['href'], headers=header)
-                except ConnectionResetError | urllib3.exceptions.ProtocolError | requests.exceptions.ConnectionError:
-                    print("connection error but continue next")
-                    continue
-                if response.status_code == 200:
-                    html_data = response.content
-                    with open(f"{volume['volume']}/{chapter['title']}.txt", 'w', encoding='utf-8') as f:
-                        f.write(html_data.decode('gbk'))
-                    valid_request += 1
-                else:
-                    print("network error", response.status_code, response.content)
+    with tqdm(total=count_chapter(),
+            desc="Getting chapter", ncols=80) as pbar:
+        while valid_request > 0:
+            valid_request = 0
+            for volume in volumes:
+                create_dir(volume['volume'])
+                for chapter in volume['chapters']:
+                    if (os.path.exists(f"{volume['volume']}/{chapter['title']}.txt")):
+                        pbar.update()
+                        continue
+                    time.sleep(2)
+                    try:
+                        response = requests.get(baseurl+chapter['href'], headers=header)
+                    except ConnectionResetError | urllib3.exceptions.ProtocolError | requests.exceptions.ConnectionError:
+                        print("connection error but continue next")
+                        continue
+                    if response.status_code == 200:
+                        html_data = response.content
+                        with open(f"{volume['volume']}/{chapter['title']}.txt", 'w', encoding='utf-8') as f:
+                            f.write(html_data.decode('gbk'))
+                        valid_request += 1
+                        pbar.update()
+                    else:
+                        print("network error", response.status_code, response.content)
 
 
 def strip_file(file:str):
@@ -138,12 +155,16 @@ def strip_file(file:str):
 
 def synthesize_file():
     book = ''
-    for volume in volumes:
-        for chapter in volume['chapters']:
-            book += f"{volume['volume']} - {chapter['title']}" + '\n\n'
-            book += '\t' + strip_file(f"{volume['volume']}/{chapter['title']}.txt") + '\n\n'
-    with open(f"{title}.txt", 'w', encoding='utf-8') as f:
-        f.write(book)
+    with tqdm(total=count_chapter()+1,
+            desc="Synthesizing file", ncols=80) as pbar:
+        for volume in volumes:
+            for chapter in volume['chapters']:
+                book += f"{volume['volume']} - {chapter['title']}" + '\n\n'
+                book += '\t' + strip_file(f"{volume['volume']}/{chapter['title']}.txt") + '\n\n'
+                pbar.update()
+        with open(f"{title}.txt", 'w', encoding='utf-8') as f:
+            f.write(book)
+        pbar.update()
 
 
 def fix_baseurl():
@@ -174,9 +195,8 @@ if __name__ == '__main__':
     baseurl = args.url
 
     fix_baseurl()
-    
+
     get_contents()
-    print_contents()
+    # print_contents()
     get_chapter()
     synthesize_file()
-
