@@ -4,10 +4,12 @@ import requests
 import os
 import time
 import urllib3
+import argparse
+import sys
 
 os.environ['NO_PROXY']="pt.csust.edu.cn" # cancel proxy
 
-baseurl = 'https://www.wenku8.net/novel/2/2542/'
+baseurl = ''
 header = {
     'User-Agent': UserAgent().random
 }
@@ -144,7 +146,35 @@ def synthesize_file():
         f.write(book)
 
 
+def fix_baseurl():
+    global baseurl
+    last_slash_pos = baseurl.rfind('/')
+    if last_slash_pos == -1 or last_slash_pos < 1:
+        sys.exit("Invalid url, maybe you can try: "
+                 "https://www.wenku8.net/novel/2/2542/")
+    baseurl = baseurl[:last_slash_pos+1]
+
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+                        prog='wenku8',
+                        description='wenku8 crawler',
+                        add_help=False,
+                        epilog='paste uri and get novel')
+    parser.add_argument('-u', '--url',
+                        help='the url for the novel catalog',
+                        required=True,
+                        dest='url')
+    parser.add_argument('-h', '--help', action='help',
+                        help='show this help message and exit')
+    parser.add_argument('-v', '--version', action='version',
+                        version='%(prog)s 0.0.1')
+
+    args = parser.parse_args()
+    baseurl = args.url
+
+    fix_baseurl()
+    
     get_contents()
     print_contents()
     get_chapter()

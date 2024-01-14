@@ -6,5 +6,9 @@
 ```
 python3 -m venv venv
 source venv/bin/activate
-make run
+make dep
+python3 wenku8.py -u=https://www.wenku8.net/novel/2/2542/
 ```
+
+# TODO
+- 支持EPUB格式并嵌入插图
