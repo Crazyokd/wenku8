@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 import requests
@@ -7,8 +9,7 @@ import urllib3
 import argparse
 import sys
 from tqdm import tqdm
-
-os.environ['NO_PROXY']="pt.csust.edu.cn" # cancel proxy
+import random
 
 baseurl = ''
 header = {
@@ -104,7 +105,7 @@ def count_chapter():
     return res
 
 
-def get_chapter():
+def get_chapter(force = False):
     valid_request = 1
     with tqdm(total=count_chapter(),
             desc="Getting chapter", ncols=80) as pbar:
@@ -113,23 +114,30 @@ def get_chapter():
             for volume in volumes:
                 create_dir(volume['volume'])
                 for chapter in volume['chapters']:
-                    if (os.path.exists(f"{volume['volume']}/{chapter['title']}.txt")):
+                    if 'downloaded' not in chapter:
+                        chapter['downloaded'] = False
+                    if chapter['downloaded']:
+                        continue
+                    if (os.path.exists(f"{volume['volume']}/{chapter['title']}.txt") and not force):
+                        chapter['downloaded'] = True
                         pbar.update()
                         continue
-                    time.sleep(2)
                     try:
                         response = requests.get(baseurl+chapter['href'], headers=header)
-                    except ConnectionResetError | urllib3.exceptions.ProtocolError | requests.exceptions.ConnectionError:
-                        print("connection error but continue next")
+                    except requests.exceptions.ConnectionError:
+                        print("connection error but continue next", end='\r')
+                        time.sleep(random.randint(0,2))
                         continue
                     if response.status_code == 200:
                         html_data = response.content
                         with open(f"{volume['volume']}/{chapter['title']}.txt", 'w', encoding='utf-8') as f:
                             f.write(html_data.decode('gbk'))
                         valid_request += 1
+                        chapter['downloaded'] = True
                         pbar.update()
                     else:
-                        print("network error", response.status_code, response.content)
+                        print("network error", response.status_code, end='\r')
+                        time.sleep(random.randint(0,2))
 
 
 def strip_file(file:str):
@@ -193,6 +201,8 @@ if __name__ == '__main__':
                         help='show this help message and exit')
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s 0.0.1')
+    parser.add_argument('-f', '--force', action='store_true',
+                        help='force download regardless of local cache')
 
     args = parser.parse_args()
     baseurl = args.url
@@ -202,5 +212,5 @@ if __name__ == '__main__':
     get_contents()
     if (args.print):
         print_contents()
-    get_chapter()
+    get_chapter(args.force)
     synthesize_file()
