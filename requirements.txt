@@ -2,3 +2,4 @@ beautifulsoup4
 requests
 fake_useragent
 tqdm
+colorlog

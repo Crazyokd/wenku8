@@ -10,6 +10,36 @@ import argparse
 import sys
 from tqdm import tqdm
 import random
+import logging
+import colorlog
+
+
+formatter = colorlog.ColoredFormatter(
+    "%(log_color)s%(levelname)-8s %(asctime)s %(filename)s:%(lineno)d %(message)s",
+    datefmt='%Y-%m-%d %H:%M:%S',
+    reset=True,
+    log_colors={
+        'DEBUG':    'cyan',
+        'INFO':     'green',
+        'WARNING':  'yellow',
+        'ERROR':    'red',
+        'CRITICAL': 'red,bg_white',
+    },
+    secondary_log_colors={},
+    style='%'
+)
+
+class TqdmToLogger(logging.Handler):
+    """日志处理器，将日志消息写入 tqdm.write，以避免与进度条冲突。"""
+    def emit(self, record):
+        msg = self.format(record)
+        tqdm.write(msg)
+
+logger = logging.getLogger()
+handler = TqdmToLogger()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 baseurl = ''
 header = {
@@ -80,14 +110,14 @@ def get_contents():
 
                 pbar.update()
     else:
-        print("network error", response.status_code, response.content)
+        logging.error("network error", response.status_code, response.content)
 
 
 def print_contents():
     # 输出提取的章节目录
     for volume in volumes:
         for chapter in volume['chapters']:
-            print(volume['volume'], chapter)
+            logging.debug(volume['volume'] + ' ' + str(chapter))
 
 def create_dir(path:str):
     try:
@@ -95,7 +125,7 @@ def create_dir(path:str):
     except FileExistsError:
         pass
     except OSError as error:
-        print(f"Creation of directory '{path}' failed: {error}")
+        logging.error(f"Creation of directory '{path}' failed: {error}")
 
 
 def count_chapter():
@@ -125,7 +155,7 @@ def get_chapter(force = False):
                     try:
                         response = requests.get(baseurl+chapter['href'], headers=header)
                     except requests.exceptions.ConnectionError:
-                        print("connection error but continue next", end='\r')
+                        logging.error("connection error but continue next")
                         time.sleep(random.randint(0,2))
                         continue
                     if response.status_code == 200:
@@ -136,7 +166,7 @@ def get_chapter(force = False):
                         chapter['downloaded'] = True
                         pbar.update()
                     else:
-                        print("network error", response.status_code, end='\r')
+                        logging.error("network error", response.status_code)
                         time.sleep(random.randint(0,2))
 
 
@@ -194,9 +224,9 @@ if __name__ == '__main__':
                         help='the url for the novel catalog',
                         required=True,
                         dest='url')
-    parser.add_argument('-p', '--print',
+    parser.add_argument('-d', '--debug',
                         action='store_true',
-                        help='print the contents')
+                        help='print debug info')
     parser.add_argument('-h', '--help', action='help',
                         help='show this help message and exit')
     parser.add_argument('-v', '--version', action='version',
@@ -205,12 +235,14 @@ if __name__ == '__main__':
                         help='force download regardless of local cache')
 
     args = parser.parse_args()
+    if args.debug:
+        logger.setLevel(level=logging.DEBUG)
+    else:
+        logger.setLevel(level=logging.INFO)
     baseurl = args.url
-
     fix_baseurl()
 
     get_contents()
-    if (args.print):
-        print_contents()
+    print_contents()
     get_chapter(args.force)
     synthesize_file()
