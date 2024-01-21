@@ -13,6 +13,8 @@ import random
 import logging
 import colorlog
 
+bar_format = "{l_bar}\033[1;32m{bar}\033[0m| {n_fmt}/{total_fmt} [{elapsed}]"
+
 
 formatter = colorlog.ColoredFormatter(
     "%(log_color)s%(levelname)-8s %(asctime)s %(filename)s:%(lineno)d %(message)s",
@@ -81,7 +83,7 @@ def get_contents():
 
         # 遍历表格中的行
         with tqdm(total=len(chapter_table.find_all('tr')),
-                  desc="Getting directory", ncols=80) as pbar:
+                  desc="Getting directory", bar_format=bar_format, ncols=80) as pbar:
             for row in chapter_table.find_all('tr'):
                 # 检查是否为卷标题行
                 volume_tag = row.find('td', class_='vcss')
@@ -138,7 +140,7 @@ def count_chapter():
 def get_chapter(force = False):
     valid_request = 1
     with tqdm(total=count_chapter(),
-            desc="Getting chapter", ncols=80) as pbar:
+            desc="Getting chapter", bar_format=bar_format, ncols=80) as pbar:
         while valid_request > 0:
             valid_request = 0
             for volume in volumes:
@@ -194,7 +196,7 @@ def strip_file(file:str):
 def synthesize_file():
     book = ''
     with tqdm(total=count_chapter()+1,
-            desc="Synthesizing file", ncols=80) as pbar:
+            desc="Synthesizing file", bar_format=bar_format, ncols=80) as pbar:
         for volume in volumes:
             for chapter in volume['chapters']:
                 book += f"{volume['volume']} - {chapter['title']}" + '\n\n'
