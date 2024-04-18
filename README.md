@@ -2,6 +2,9 @@
 
 写的速食品，但效果还算不赖。
 
+# example
+![example](example.png)
+
 # run
 ```
 python3 -m venv venv
